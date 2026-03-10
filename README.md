@@ -1,6 +1,8 @@
-# router — Установка Tailscale на OpenWrt с podkop
+# Cudy TR Tailscale — Установка Tailscale на OpenWrt с podkop
 
-Скрипты для прошивки роутеров OpenWrt, на которых одновременно работают **podkop** (обход блокировок через VLESS/Reality) и **Tailscale** (VPN-меш для удалённого доступа).
+Скрипты для роутеров серии **Cudy TR30** (и других TR-серий) на OpenWrt с **малым объёмом flash-памяти**, на которых одновременно работают **podkop** (обход блокировок через VLESS/Reality) и **Tailscale** (VPN-меш для удалённого доступа).
+
+> **Важно про память.** Cudy TR30 — роутер с небольшим встроенным хранилищем. Здесь используется специально скомпилированная UPX-сборка Tailscale от [GuNanOvO](https://github.com/GuNanOvO/openwrt-tailscale), которая весит в разы меньше официальной. После установки podkop + Tailscale суммарно занимают около **62% общей flash-памяти** — этого достаточно для стабильной работы.
 
 ---
 
@@ -31,7 +33,7 @@
 Выполни на роутере одну команду:
 
 ```sh
-wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/router/main/small-tailscale.sh && sh /tmp/s.sh
+wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/small-tailscale.sh && sh /tmp/s.sh
 ```
 
 Скрипт сам определит архитектуру роутера, скачает нужный пакет, запустит демон, попросит авторизоваться в Tailscale и применит все необходимые фиксы.
@@ -40,17 +42,18 @@ wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/router/main/small
 
 ## Совместимость
 
-- OpenWrt (ядро 5.x / 6.x)
+- Роутеры серии **Cudy TR30** (aarch64_cortex-a53) и другие TR-серии на OpenWrt
+- OpenWrt с ядром 5.x / 6.x и малым объёмом flash-памяти
 - Архитектуры: aarch64, mips, x86 и другие (определяется автоматически)
 - podkop v0.7+ (GuNanOvO репозиторий)
-- Tailscale v1.92.5 (из репозитория [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale))
+- Tailscale v1.92.5 — компактная UPX-сборка от [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale)
 
 ---
 
 ## Что делает скрипт
 
 1. Определяет архитектуру роутера через `opkg print-architecture`
-2. Скачивает и устанавливает Tailscale v1.92.5
+2. Скачивает и устанавливает Tailscale v1.92.5 (компактная сборка)
 3. Запускает демон `tailscaled`
 4. Запускает `tailscale up --accept-dns=false --accept-routes --reset` и выводит ссылку для авторизации
 5. Добавляет прямой маршрут к подсети controlplane (`192.200.0.0/24`)
