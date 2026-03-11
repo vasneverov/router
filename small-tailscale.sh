@@ -21,17 +21,20 @@ wget -O /tmp/tailscale.ipk "$IPK_URL"
 opkg install /tmp/tailscale.ipk
 rm /tmp/tailscale.ipk
 
-echo "=== [2/5] Обходим podkop для трафика роутера ==="
+echo "=== [2/5] Исключаем Tailscale controlplane из podkop ==="
+# Вставляем return-правила ПЕРВЫМИ в цепочки podkop — до правил с mark
+# nftables обрабатывает правила по порядку, return выходит из цепочки без маркировки
+nft insert rule inet PodkopTable mangle_output ip daddr 192.200.0.0/24 return 2>/dev/null
+nft insert rule inet PodkopTable mangle ip daddr 192.200.0.0/24 return 2>/dev/null
+# Также добавляем маршрут в main таблицу и ip rule выше podkop (priority 105)
 GW=$(ip route show default | awk '/default/ {print $3; exit}')
 DEV=$(ip route show default | awk '/default/ {print $5; exit}')
 ip route add 192.200.0.0/24 via $GW dev $DEV 2>/dev/null
 ip rule add to 192.200.0.0/24 priority 40 lookup main 2>/dev/null
-ip rule add priority 50 not fwmark 0x100000 lookup main 2>/dev/null
-echo "Маршрут: 192.200.0.0/24 via $GW dev $DEV"
+echo "nft return-правила добавлены, маршрут: 192.200.0.0/24 via $GW dev $DEV"
 echo "Проверка: $(ip route get 192.200.0.1 2>/dev/null)"
 
 echo "=== [3/5] Запуск демона ==="
-# Убиваем всё что могло остаться после opkg install
 killall tailscaled 2>/dev/null
 rm -f /var/run/tailscale/tailscaled.sock
 sleep 2
@@ -40,14 +43,12 @@ mkdir -p /etc/tailscale /var/run/tailscale
 TAILSCALED_PID=$!
 echo "tailscaled PID: $TAILSCALED_PID"
 sleep 5
-
-# Проверяем что демон живой
 if ! kill -0 $TAILSCALED_PID 2>/dev/null; then
   echo "ОШИБКА: tailscaled упал. Лог:"
-  cat /tmp/tailscaled.log | tail -5
+  tail -5 /tmp/tailscaled.log
   exit 1
 fi
-echo "Демон запущен, сокет: $(ls /var/run/tailscale/)"
+echo "Демон запущен ✓"
 
 echo "=== [4/5] АВТОРИЗАЦИЯ ==="
 echo "Открой ссылку ниже в браузере и подтверди подключение:"
@@ -62,11 +63,13 @@ tailscale serve --bg --tcp 22  tcp://localhost:22
 cat > /etc/rc.local << 'RCEOF'
 #!/bin/sh
 (sleep 15
+# Исключаем Tailscale controlplane из podkop
+nft insert rule inet PodkopTable mangle_output ip daddr 192.200.0.0/24 return 2>/dev/null
+nft insert rule inet PodkopTable mangle ip daddr 192.200.0.0/24 return 2>/dev/null
 GW=$(ip route show default | awk '/default/ {print $3; exit}')
 DEV=$(ip route show default | awk '/default/ {print $5; exit}')
 ip route add 192.200.0.0/24 via $GW dev $DEV 2>/dev/null
 ip rule add to 192.200.0.0/24 priority 40 lookup main 2>/dev/null
-ip rule add priority 50 not fwmark 0x100000 lookup main 2>/dev/null
 tailscale serve --bg --tcp 80  tcp://localhost:80
 tailscale serve --bg --tcp 22  tcp://localhost:22
 tailscale serve --bg --tcp 443 tcp://localhost:443) &
