@@ -1,8 +1,23 @@
-# Cudy TR Tailscale — Установка Tailscale на OpenWrt с podkop
+# Cudy TR + Xiaomi AX — Tailscale на OpenWrt с podkop
 
-Скрипты для роутеров серии **Cudy TR30** (и других TR-серий) на OpenWrt с **малым объёмом flash-памяти**, на которых одновременно работают **podkop** (обход блокировок через VLESS/Reality) и **Tailscale** (VPN-меш для удалённого доступа).
+Универсальный скрипт установки **Tailscale** на роутеры OpenWrt с **podkop** (обход блокировок через VLESS/Reality). Проверен на:
 
-> **Важно про память.** Cudy TR30 — роутер с небольшим встроенным хранилищем. Здесь используется специально скомпилированная UPX-сборка Tailscale от [GuNanOvO](https://github.com/GuNanOvO/openwrt-tailscale), которая весит в разы меньше официальной. После установки podkop + Tailscale суммарно занимают около **62% общей flash-памяти** — этого достаточно для стабильной работы.
+- **Cudy TR30** (aarch64_cortex-a53) — роутер с малым объёмом flash-памяти
+- **Xiaomi AX3000T** (aarch64_cortex-a53) — роутер с нормальным объёмом памяти
+
+Работает на любом OpenWrt роутере с тем же процессором.
+
+> **Про память на Cudy TR30.** Здесь используется специально скомпилированная UPX-сборка Tailscale от [GuNanOvO](https://github.com/GuNanOvO/openwrt-tailscale), которая весит в разы меньше официальной. После установки podkop + Tailscale суммарно занимают около **62% общей flash-памяти** — этого достаточно для стабильной работы.
+
+---
+
+## Установка (одна команда)
+
+```sh
+wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/small-tailscale.sh && sh /tmp/s.sh
+```
+
+Скрипт сам всё сделает: снесёт старую версию если есть, установит нужную, добавит маршруты и попросит авторизоваться.
 
 ---
 
@@ -18,44 +33,30 @@
 
 ---
 
-## Решение
+## Что делает скрипт
 
-1. **Откат на Tailscale v1.92.5** — стабильная версия без бага с state-файлом.
-2. **`--accept-dns=false`** — запрет на перехват DNS, чтобы Tailscale не лез со своим резолвером через podkop.
-3. **Прямой маршрут для `192.200.0.0/24`** — подсеть серверов controlplane.tailscale.com выводится напрямую, минуя туннель podkop.
-4. **`tailscale serve`** — проброс портов 22, 80, 443 для удалённого доступа к роутеру через Tailscale-сеть.
-5. **`/etc/rc.local`** — все фиксы применяются автоматически после перезагрузки.
+1. **Очистка** — сносит всё что было установлено раньше (любую версию Tailscale)
+2. **Установка Tailscale v1.92.5** — стабильная версия, компактная UPX-сборка
+3. **Маршрут `192.200.0.0/24`** — добавляется **до** запуска, чтобы Tailscale мог достучаться до своего controlplane напрямую, минуя туннель podkop
+4. **Запуск демона** с проверкой что он живой
+5. **`tailscale up --accept-dns=false`** — запрет перехвата DNS
+6. **`tailscale serve`** — проброс портов 22, 80, 443 для удалённого доступа
+7. **`/etc/rc.local`** — все фиксы применяются автоматически после перезагрузки
 
 ---
 
-## Установка
+## Решение в двух словах
 
-Выполни на роутере одну команду:
-
-```sh
-wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/small-tailscale.sh && sh /tmp/s.sh
-```
-
-Скрипт сам определит архитектуру роутера, скачает нужный пакет, запустит демон, попросит авторизоваться в Tailscale и применит все необходимые фиксы.
+1. **Tailscale v1.92.5** — без бага с state-файлом
+2. **`--accept-dns=false`** — не трогаем DNS
+3. **Маршрут до controlplane ДО авторизации** — иначе `tailscale up` зависает навсегда
+4. **`/etc/rc.local`** — всё восстанавливается после перезагрузки
 
 ---
 
 ## Совместимость
 
-- Роутеры серии **Cudy TR30** (aarch64_cortex-a53) и другие TR-серии на OpenWrt
-- OpenWrt с ядром 5.x / 6.x и малым объёмом flash-памяти
-- Архитектуры: aarch64, mips, x86 и другие (определяется автоматически)
+- Роутеры на **aarch64_cortex-a53**: Cudy TR30, Xiaomi AX3000T и другие
+- OpenWrt 23.x / 24.x
 - podkop v0.7+ (GuNanOvO репозиторий)
-- Tailscale v1.92.5 — компактная UPX-сборка от [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale)
-
----
-
-## Что делает скрипт
-
-1. Определяет архитектуру роутера через `opkg print-architecture`
-2. Скачивает и устанавливает Tailscale v1.92.5 (компактная сборка)
-3. Запускает демон `tailscaled`
-4. Запускает `tailscale up --accept-dns=false --accept-routes --reset` и выводит ссылку для авторизации
-5. Добавляет прямой маршрут к подсети controlplane (`192.200.0.0/24`)
-6. Включает `tailscale serve` на портах 22, 80, 443
-7. Прописывает автозапуск всех фиксов в `/etc/rc.local`
+- Tailscale v1.92.5 — [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale)
