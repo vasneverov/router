@@ -2,6 +2,8 @@
 
 Универсальный скрипт установки Tailscale на роутеры OpenWrt с podkop.
 
+Использует облегчённую сборку Tailscale ([gunanovo/openwrt-tailscale](https://github.com/gunanovo/openwrt-tailscale)) — сжатую UPX-версию специально для роутеров с ограниченной памятью (~16–128 МБ). Стандартный пакет из репозитория OpenWrt на таких устройствах не помещается.
+
 **Проверено на:** Cudy WR3000S, Cudy TR30 (OpenWrt 24.10.x)
 
 ## Установка
@@ -11,7 +13,7 @@ wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale
 ```
 
 Скрипт:
-1. Добавляет репозиторий и устанавливает Tailscale
+1. Добавляет репозиторий с компактной сборкой Tailscale и устанавливает её
 2. Применяет nft/ip rule чтобы трафик к Tailscale controlplane не уходил через podkop
 3. Запускает `tailscale up` — открываешь ссылку в браузере и авторизуешься
 4. Настраивает serve на порты 80, 443, 22
