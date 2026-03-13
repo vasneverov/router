@@ -26,7 +26,8 @@ tailscale serve --bg --tcp 443 tcp://localhost:443
 tailscale serve --bg --tcp 22  tcp://localhost:22
 tailscale serve status
 
-printf '#!/bin/sh\n(sleep 10; tailscale serve --bg --tcp 80 tcp://localhost:80; tailscale serve --bg --tcp 22 tcp://localhost:22; tailscale serve --bg --tcp 443 tcp://localhost:443) &\nexit 0\n' > /etc/rc.local
+# Записываем rc.local с увеличенным sleep чтобы tailscaled успел подняться
+printf '#!/bin/sh\n(sleep 30; tailscale serve --bg --tcp 80 tcp://localhost:80; tailscale serve --bg --tcp 22 tcp://localhost:22; tailscale serve --bg --tcp 443 tcp://localhost:443) &\nexit 0\n' > /etc/rc.local
 chmod +x /etc/rc.local
 
 echo ""
