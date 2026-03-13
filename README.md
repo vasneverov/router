@@ -1,36 +1,55 @@
-# Tailscale на OpenWrt с podkop
+# Tailscale на OpenWrt — Cudy WR3000S / TR30
 
-Универсальный скрипт установки Tailscale на роутеры OpenWrt с podkop.
+Скрипт автоматической установки и настройки Tailscale на роутеры **Cudy WR3000S** и **Cudy TR30** под управлением OpenWrt 24.10.x.
 
-Использует облегчённую сборку Tailscale ([gunanovo/openwrt-tailscale](https://github.com/gunanovo/openwrt-tailscale)) — сжатую UPX-версию специально для роутеров с ограниченной памятью (~16–128 МБ). Стандартный пакет из репозитория OpenWrt на таких устройствах не помещается.
+Проверено на 100+ роутерах в реальных условиях эксплуатации в России.
 
-**Проверено на:** Cudy WR3000S, Cudy TR30 (OpenWrt 24.10.x)
+## Что делает скрипт
+
+1. Определяет архитектуру роутера автоматически
+2. Устанавливает облегчённую UPX-сборку Tailscale от [GuNanOvO/openwrt-tailscale](https://github.com/GuNanOvO/openwrt-tailscale) — специально для роутеров с малым объёмом памяти (~16–128 МБ)
+3. Прописывает `/etc/init.d/tailscale` с режимом `--tun=userspace-networking` и `TS_DEBUG_FIREWALL_MODE=none` — это ключевое условие стабильной работы на Cudy WR3000S/TR30
+4. Прописывает `/etc/rc.local` с автозапуском Tailscale и serve-портами после перезагрузки
+5. Запускает авторизацию — появляется ссылка, переходишь, нажимаешь подтвердить
+6. Прописывает serve-порты 80, 443, 22 для удалённого доступа к роутеру через Tailscale
+
+## Почему userspace-networking?
+
+На роутерах Cudy WR3000S и TR30 (OpenWrt 24.10.x, nftables) стандартный режим Tailscale конфликтует с сетевым стеком. Это проявляется так:
+
+- Tailscale поднимается, точка зеленеет
+- Через 20–90 секунд точка гаснет
+- В логах: `control: map response long-poll timed out!`
+- При этом интернет работает, подкоп работает — только Tailscale падает
+
+**Решение:** запускать `tailscaled` с флагом `--tun=userspace-networking` и `TS_DEBUG_FIREWALL_MODE=none`. В этом режиме Tailscale не трогает ядро и nftables, работает полностью в userspace. Соединение держится стабильно.
 
 ## Установка
 
-```sh
-wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/small-tailscale.sh && sh /tmp/s.sh
-```
-
-Скрипт:
-1. Добавляет репозиторий с компактной сборкой Tailscale и устанавливает её
-2. Применяет nft/ip rule чтобы трафик к Tailscale controlplane не уходил через podkop
-3. Запускает `tailscale up` — открываешь ссылку в браузере и авторизуешься
-4. Настраивает serve на порты 80, 443, 22
-5. Прописывает rc.local для автозапуска после перезагрузки
-
-## Удаление
+Подключись к роутеру по SSH и выполни одну команду:
 
 ```sh
-/etc/init.d/tailscale stop 2>/dev/null; killall tailscaled 2>/dev/null; sleep 2; opkg remove tailscale --force-removal-of-dependent-packages 2>/dev/null; rm -rf /var/lib/tailscale /etc/tailscale /var/run/tailscale /etc/rc.local; echo "Чисто"
+wget -O /tmp/setup.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/setup.sh && sh /tmp/setup.sh
 ```
 
-## Как это работает
+Скрипт установит Tailscale, настроит автозапуск и покажет ссылку для авторизации.
 
-podkop маркирует трафик через nftables и отправляет его в свой туннель. Без правок трафик к `controlplane.tailscale.com` (192.200.0.0/24) тоже попадает в podkop, из-за чего `tailscale up` зависает.
+После появления ссылки:
+1. Перейди по ссылке в браузере
+2. Авторизуй устройство в своём Tailscale аккаунте
+3. SSH-соединение может оборваться — это нормально
+4. Переподключись по SSH и убедись что точка зелёная
 
-Скрипт добавляет:
-- `nft insert rule` с `return` — исключает 192.200.0.0/24 из цепочек podkop
-- `ip rule add to 192.200.0.0/24 priority 50 lookup main` — форсирует маршрутизацию через main таблицу
+## Проверено на
 
-Оба правила также прописываются в rc.local и применяются при каждой загрузке.
+- Cudy WR3000S (aarch64_cortex-a53, OpenWrt 24.10.5)
+- Cudy TR30 (aarch64_cortex-a53, OpenWrt 24.10.4)
+
+## Файлы
+
+- `setup.sh` — полная установка, настройка и авторизация (один скрипт, всё включено)
+- `install.sh` — только установка пакета (без авторизации)
+
+## Лицензия
+
+MIT
