@@ -1,7 +1,7 @@
 #!/bin/sh
 # =============================================================
-# Tailscale setup script for Cudy WR3000S / TR30 (OpenWrt)
-# Repo: https://github.com/vasneverov/cudy-tr-tailscale
+# Tailscale setup for Cudy WR3000S / TR30 (OpenWrt)
+# https://github.com/vasneverov/cudy-tr-tailscale
 # =============================================================
 
 ARCH=$(opkg print-architecture | awk 'NF==3 && $3~/^[0-9]+$/ {print $2}' | tail -1)
@@ -10,9 +10,7 @@ IPK_URL="https://github.com/GuNanOvO/openwrt-tailscale/releases/download/v${VERS
 
 echo ">>> Arch: $ARCH"
 echo ">>> Installing Tailscale $VERSION..."
-
 opkg remove tailscale 2>/dev/null || true
-
 wget -O /tmp/tailscale.ipk "$IPK_URL" && opkg install /tmp/tailscale.ipk
 rm -f /tmp/tailscale.ipk
 
@@ -58,32 +56,32 @@ exit 0
 ENDRC
 chmod +x /etc/rc.local
 
-echo ">>> Starting tailscaled..."
-/etc/init.d/tailscale restart
-sleep 8
-
-echo ">>> Authorizing Tailscale..."
-tailscale up --accept-dns=false --accept-routes
-
-echo ">>> Setting up Tailscale serve ports..."
-tailscale serve --bg --tcp 80 tcp://localhost:80
-tailscale serve --bg --tcp 443 tcp://localhost:443
-tailscale serve --bg --tcp 22 tcp://localhost:22
-echo ">>> Done! Tailscale is ready."
-tailscale serve status
-
-
-echo ">>> Installing Tailscale watchdog..."
+echo ">>> Installing watchdog..."
 cat > /usr/bin/tailscale-watchdog.sh << 'ENDWD'
 #!/bin/sh
 STATUS=$(tailscale status 2>&1 | grep -c "100\.")
 if [ "$STATUS" -eq "0" ]; then
   logger -t tailscale-watchdog "Tailscale is down, restarting..."
-    tailscale up --accept-dns=false --accept-routes
-    fi
-    ENDWD
-    chmod +x /usr/bin/tailscale-watchdog.sh
-    echo "* * * * * /usr/bin/tailscale-watchdog.sh" >> /etc/crontabs/root
-    /etc/init.d/cron enable
-    /etc/init.d/cron restart
-    echo ">>> Watchdog installed! Checks every minute."
+  tailscale up --accept-dns=false --accept-routes
+fi
+ENDWD
+chmod +x /usr/bin/tailscale-watchdog.sh
+echo "* * * * * /usr/bin/tailscale-watchdog.sh" >> /etc/crontabs/root
+/etc/init.d/cron enable
+/etc/init.d/cron restart
+echo ">>> Watchdog installed. Checks every minute."
+
+echo ">>> Starting tailscaled..."
+/etc/init.d/tailscale restart
+sleep 8
+
+echo ">>> Authorizing Tailscale..."
+echo ">>> Follow the auth URL. SSH may disconnect - that is normal!"
+tailscale up --accept-dns=false --accept-routes
+
+echo ">>> Setting up serve ports..."
+tailscale serve --bg --tcp 80 tcp://localhost:80
+tailscale serve --bg --tcp 443 tcp://localhost:443
+tailscale serve --bg --tcp 22 tcp://localhost:22
+echo ">>> Done! Tailscale is ready."
+tailscale serve status
