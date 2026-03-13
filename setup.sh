@@ -71,3 +71,19 @@ tailscale serve --bg --tcp 443 tcp://localhost:443
 tailscale serve --bg --tcp 22 tcp://localhost:22
 echo ">>> Done! Tailscale is ready."
 tailscale serve status
+
+
+echo ">>> Installing Tailscale watchdog..."
+cat > /usr/bin/tailscale-watchdog.sh << 'ENDWD'
+#!/bin/sh
+STATUS=$(tailscale status 2>&1 | grep -c "100\.")
+if [ "$STATUS" -eq "0" ]; then
+  logger -t tailscale-watchdog "Tailscale is down, restarting..."
+    tailscale up --accept-dns=false --accept-routes
+    fi
+    ENDWD
+    chmod +x /usr/bin/tailscale-watchdog.sh
+    echo "* * * * * /usr/bin/tailscale-watchdog.sh" >> /etc/crontabs/root
+    /etc/init.d/cron enable
+    /etc/init.d/cron restart
+    echo ">>> Watchdog installed! Checks every minute."
