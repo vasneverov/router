@@ -5,7 +5,7 @@
 # =============================================================
 
 ARCH=$(opkg print-architecture | awk 'NF==3 && $3~/^[0-9]+$/ {print $2}' | tail -1)
-VERSION="1.96.1"
+VERSION="1.96.0"
 IPK_URL="https://github.com/GuNanOvO/openwrt-tailscale/releases/download/v${VERSION}/tailscale_${VERSION}_${ARCH}.ipk"
 
 echo ">>> Arch: $ARCH"
