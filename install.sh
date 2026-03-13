@@ -1,56 +1,36 @@
 #!/bin/sh
-# Tailscale installer for OpenWrt (WR3000S and compatible)
+# Шаг 1 из 2: Установка Tailscale
 # https://github.com/vasneverov/cudy-tr-tailscale
 #
-# Usage:
+# Запусти эту команду:
 #   wget -O /tmp/install.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/install.sh && sh /tmp/install.sh
+#
+# После установки выполни авторизацию:
+#   wget -O /tmp/setup.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/setup.sh && sh /tmp/setup.sh
 
-echo "=== Tailscale installer for OpenWrt ==="
+echo "=== [1/2] Установка Tailscale ==="
 
-# Step 1: Clean duplicate repo entries
-echo "[1/5] Cleaning duplicate repo entries..."
+echo "[1/4] Очистка дублей репозитория..."
 grep -v "openwrt-tailscale" /etc/opkg/customfeeds.conf > /tmp/feeds.tmp
 mv /tmp/feeds.tmp /etc/opkg/customfeeds.conf
 
-# Step 2: Add signing key
-echo "[2/5] Adding signing key..."
-wget -O /tmp/key-build.pub https://gunanovo.github.io/openwrt-tailscale/key-build.pub || { echo "ERROR: failed to download key"; exit 1; }
+echo "[2/4] Добавление ключа..."
+wget -O /tmp/key-build.pub https://gunanovo.github.io/openwrt-tailscale/key-build.pub || { echo "ERROR: не удалось скачать ключ"; exit 1; }
 opkg-key add /tmp/key-build.pub
 rm /tmp/key-build.pub
 
-# Step 3: Add repository (auto-detect architecture)
-echo "[3/5] Adding repository..."
+echo "[3/4] Добавление репозитория..."
 ARCH=$(opkg print-architecture | awk 'NF==3 && $3~/^[0-9]+$/ {print $2}' | tail -1)
-echo "Detected architecture: $ARCH"
+echo "Архитектура: $ARCH"
 echo "src/gz openwrt-tailscale https://gunanovo.github.io/openwrt-tailscale/$ARCH" >> /etc/opkg/customfeeds.conf
 
-# Step 4: Update and install
-echo "[4/5] Installing Tailscale..."
+echo "[4/4] Установка пакета..."
 opkg update || { echo "ERROR: opkg update failed"; exit 1; }
 opkg install tailscale || { echo "ERROR: install failed"; exit 1; }
 
-# Step 5: Authorize
-echo "[5/5] Starting Tailscale..."
 echo ""
-echo ">>> Сейчас появится ссылка. Перейди по ней в браузере для авторизации. <<<"
+echo "=== Tailscale установлен! ==="
 echo ""
-tailscale up --accept-dns=false --accept-routes --reset
-
+echo ">>> Теперь выполни шаг 2 — авторизацию: <<<"
+echo "wget -O /tmp/setup.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/setup.sh && sh /tmp/setup.sh"
 echo ""
-echo ">>> Авторизация прошла успешно! Настраиваю порты... <<<"
-echo ""
-sleep 3
-
-# Step 6: Configure serve
-tailscale serve --bg --tcp 80  tcp://localhost:80
-tailscale serve --bg --tcp 443 tcp://localhost:443
-tailscale serve --bg --tcp 22  tcp://localhost:22
-tailscale serve status
-
-# Step 7: Write autostart
-printf '#!/bin/sh\n(sleep 10; tailscale serve --bg --tcp 80 tcp://localhost:80; tailscale serve --bg --tcp 22 tcp://localhost:22; tailscale serve --bg --tcp 443 tcp://localhost:443) &\nexit 0\n' > /etc/rc.local
-chmod +x /etc/rc.local
-
-echo ""
-echo "=== Готово! Tailscale установлен и настроен. ==="
-echo "=== После перезагрузки Tailscale поднимется автоматически через ~40 секунд. ==="
