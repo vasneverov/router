@@ -1,36 +1,34 @@
-# Tailscale для OpenWrt с podkop
+# Tailscale на OpenWrt с podkop
 
-Скрипт установки Tailscale на роутеры OpenWrt, на которых уже установлен podkop.
+Универсальный скрипт установки Tailscale на роутеры OpenWrt с podkop.
 
-## Однострочник для установки
+**Проверено на:** Cudy WR3000S, Cudy TR30 (OpenWrt 24.10.x)
+
+## Установка
 
 ```sh
 wget -O /tmp/s.sh https://raw.githubusercontent.com/vasneverov/cudy-tr-tailscale/main/small-tailscale.sh && sh /tmp/s.sh
 ```
 
-После запуска скрипт выведет ссылку вида `https://login.tailscale.com/a/...` — открой её в браузере, подтверди подключение и жди `Success.` в терминале. После этого скрипт завершится сам.
+Скрипт:
+1. Добавляет репозиторий и устанавливает Tailscale
+2. Применяет nft/ip rule чтобы трафик к Tailscale controlplane не уходил через podkop
+3. Запускает `tailscale up` — открываешь ссылку в браузере и авторизуешься
+4. Настраивает serve на порты 80, 443, 22
+5. Прописывает rc.local для автозапуска после перезагрузки
 
-## Проверенные устройства
+## Удаление
 
-- **Cudy WR3000S** (aarch64_cortex-a53, малый объём памяти) ✅
-
-Другие модели будут добавлены по мере проверки.
-
-## Что делает скрипт и почему он работает
-
-**Шаг 1 — Установка через репозиторий.**
-Скрипт устанавливает Tailscale через официальный репозиторий GuNanOvO, а не скачивает ipk напрямую. Это важно: при установке через `opkg install` пакет корректно регистрируется в системе и запускается через init.d.
-
-**Шаг 2 — Авторизация с цепочкой &&.**
-Команды выстроены цепочкой через `&&`:
 ```sh
-tailscale up ... && tailscale serve --tcp 80 ... && tailscale serve --tcp 443 ... && tailscale serve --tcp 22 ...
+/etc/init.d/tailscale stop 2>/dev/null; killall tailscaled 2>/dev/null; sleep 2; opkg remove tailscale --force-removal-of-dependent-packages 2>/dev/null; rm -rf /var/lib/tailscale /etc/tailscale /var/run/tailscale /etc/rc.local; echo "Чисто"
 ```
-Это ключевое отличие от других скриптов. `tailscale serve` запускается **только после** того, как `tailscale up` завершился с `Success.`. Если запускать serve до завершения авторизации — соединение рвётся через 10–15 секунд.
 
-**Шаг 3 — rc.local для автовосстановления.**
-После перезагрузки роутера tailscaled запускается автоматически через init.d. Скрипт добавляет в `/etc/rc.local` команды `tailscale serve` с задержкой 10 секунд — чтобы дождаться пока демон поднимется.
+## Как это работает
 
-## Совместимость
+podkop маркирует трафик через nftables и отправляет его в свой туннель. Без правок трафик к `controlplane.tailscale.com` (192.200.0.0/24) тоже попадает в podkop, из-за чего `tailscale up` зависает.
 
-Скрипт работает на роутерах OpenWrt с podkop. podkop туннелирует трафик через nftables и не мешает Tailscale, так как Tailscale устанавливается через системный репозиторий и корректно интегрируется с nftables.
+Скрипт добавляет:
+- `nft insert rule` с `return` — исключает 192.200.0.0/24 из цепочек podkop
+- `ip rule add to 192.200.0.0/24 priority 50 lookup main` — форсирует маршрутизацию через main таблицу
+
+Оба правила также прописываются в rc.local и применяются при каждой загрузке.
